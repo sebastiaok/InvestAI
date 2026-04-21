@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from app.graphs.investment_graph import build_graph
 from app.schemas import AnalyzeRequest, AnalyzeResponse, AgentSection
+from app.services.market_tools import normalize_ticker_input
 
 app = FastAPI(title="InvestAI Agent")
 graph = build_graph()
@@ -20,10 +21,11 @@ def root():
 @app.post("/analyze", response_model=AnalyzeResponse)
 def analyze(payload: AnalyzeRequest):
     try:
+        normalized_ticker = normalize_ticker_input(payload.ticker)
         state = graph.invoke(
             {
                 "query": payload.query,
-                "ticker": payload.ticker,
+                "ticker": normalized_ticker,
                 "portfolio_text": payload.portfolio_text,
             }
         )
@@ -32,7 +34,6 @@ def analyze(payload: AnalyzeRequest):
             AgentSection(title="Fundamental", summary=state.get("fundamental_notes", "")),
             AgentSection(title="Risk", summary=state.get("risk_notes", "")),
             AgentSection(title="Portfolio", summary=state.get("portfolio_notes", "")),
-            AgentSection(title="Research", summary=state.get("research_context", "")),
             AgentSection(title="Review", summary=state.get("review_notes", "")),
         ]
         return AnalyzeResponse(
@@ -49,7 +50,6 @@ def analyze(payload: AnalyzeRequest):
             AgentSection(title="Fundamental", summary=""),
             AgentSection(title="Risk", summary=""),
             AgentSection(title="Portfolio", summary=""),
-            AgentSection(title="Research", summary=""),
             AgentSection(title="Review", summary=""),
         ]
         return AnalyzeResponse(
