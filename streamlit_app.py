@@ -1,8 +1,8 @@
 import requests
 import streamlit as st
 
-st.set_page_config(page_title="AI Investment Analysis Multi-Agent", layout="wide")
-st.title("📈 AI Investment Analysis Multi-Agent")
+st.set_page_config(page_title="InvestAI Agent", layout="wide")
+st.title("📈 InvestAI Agent")
 st.caption("시장/재무/리스크/포트폴리오/RAG를 결합한 투자분석 Copilot")
 
 with st.sidebar:

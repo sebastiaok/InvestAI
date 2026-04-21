@@ -1,4 +1,4 @@
-# AI Investment Analysis Multi-Agent
+# InvestAI Agent
 
 실무형 투자분석 Copilot 예제입니다. 이 프로젝트는 투자 판단을 자동으로 대신하지 않고,
 시장 조사, 뉴스 요약, 포트폴리오 리스크 점검, RAG 기반 근거 제시, 리포트 초안 작성을 수행합니다.
@@ -82,8 +82,8 @@ flowchart TD
     RV -. uses .-> LLM
     RP -. uses .-> LLM
 
-    RP --> OK[AnalyzeResponse<br/>plan + sections + final_report + warnings=[]]
-    EH --> FAIL[Fallback AnalyzeResponse<br/>empty plan/sections + error final_report + warnings]
+    RP --> OK[AnalyzeResponse<br/>plan + sections + final_report + empty warnings]
+    EH --> FAIL[Fallback AnalyzeResponse<br/>empty plan and sections + error final_report + warnings]
 
     OK --> ST
     FAIL --> ST
