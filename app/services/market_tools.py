@@ -3,40 +3,6 @@ from __future__ import annotations
 from typing import Dict, List
 
 
-TICKER_ALIAS = {
-    "삼성전자": "005930.KS",
-    "sk하이닉스": "000660.KS",
-    "하이닉스": "000660.KS",
-    "네이버": "035420.KS",
-    "카카오": "035720.KS",
-    "apple": "AAPL",
-    "애플": "AAPL",
-    "microsoft": "MSFT",
-    "마이크로소프트": "MSFT",
-    "tesla": "TSLA",
-    "테슬라": "TSLA",
-    "nvidia": "NVDA",
-    "엔비디아": "NVDA",
-}
-
-
-def normalize_ticker_input(value: str | None) -> str | None:
-    """Allow stock name input and normalize into a ticker-like string."""
-    if not value:
-        return None
-
-    cleaned = value.strip()
-    if not cleaned:
-        return None
-
-    mapped = TICKER_ALIAS.get(cleaned.lower()) or TICKER_ALIAS.get(cleaned)
-    if mapped:
-        return mapped
-
-    # If user already entered a ticker-like value, keep canonical uppercase form.
-    return cleaned.upper()
-
-
 def get_market_snapshot(ticker: str | None) -> Dict:
     return {
         "ticker": ticker or "UNKNOWN",
