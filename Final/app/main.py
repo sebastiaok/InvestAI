@@ -27,6 +27,7 @@ def analyze(payload: AnalyzeRequest):
                 "query": payload.query,
                 "ticker": normalized_ticker,
                 "portfolio_text": payload.portfolio_text,
+                "risk_profile": payload.risk_profile,
             }
         )
         sections = [

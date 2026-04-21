@@ -1,5 +1,15 @@
 import requests
 import streamlit as st
+import json
+
+
+def profile_rule_summary(risk_profile: str) -> str:
+    profile = (risk_profile or "balanced").lower().strip()
+    if profile == "conservative":
+        return "보수형 규칙 적용: 원금 보전, 변동성 최소화, 방어적 대응(현금 비중/분할매수/손절 기준)을 우선합니다."
+    if profile == "aggressive":
+        return "공격형 규칙 적용: 성장 기회와 업사이드 분석 비중을 높이고, 손실 허용 범위를 함께 제시합니다."
+    return "균형형 규칙 적용: 수익 기회와 리스크 관리 전략을 균형 있게 제시합니다."
 
 
 def decode_uploaded_portfolio(uploaded_file):
@@ -167,7 +177,18 @@ if st.session_state.result_error:
 
 if st.session_state.result_data:
     data = st.session_state.result_data
+    st.info(f"리스크 성향: {risk_profile}\n\n{profile_rule_summary(risk_profile)}")
     st.write(data["final_report"])
+    st.download_button(
+        "최종 리포트 다운로드 (.txt)",
+        data=data["final_report"],
+        file_name="investai_final_report.txt",
+        mime="text/plain",
+        use_container_width=True,
+    )
+
+    with st.expander("Planner Result", expanded=False):
+        render_plan(data.get("plan"))
 
     st.subheader("Agent 결과")
     for section in data["sections"]:

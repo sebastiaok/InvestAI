@@ -17,6 +17,7 @@ class AgentState(TypedDict, total=False):
     query: str
     ticker: Optional[str]
     portfolio_text: Optional[str]
+    risk_profile: Optional[str]
     plan: Dict[str, Any]
     market_notes: str
     fundamental_notes: str
@@ -27,7 +28,14 @@ class AgentState(TypedDict, total=False):
 
 
 def planner_node(state: AgentState) -> AgentState:
-    return {"plan": run_planner(state["query"], state.get("ticker"), state.get("portfolio_text"))}
+    return {
+        "plan": run_planner(
+            state["query"],
+            state.get("ticker"),
+            state.get("portfolio_text"),
+            state.get("risk_profile"),
+        )
+    }
 
 
 def market_node(state: AgentState) -> AgentState:
@@ -41,7 +49,10 @@ def fundamental_node(state: AgentState) -> AgentState:
 def risk_node(state: AgentState) -> AgentState:
     return {
         "risk_notes": run_risk_agent(
-            state["query"], state.get("market_notes", ""), state.get("fundamental_notes", "")
+            state["query"],
+            state.get("market_notes", ""),
+            state.get("fundamental_notes", ""),
+            state.get("risk_profile"),
         )
     }
 
@@ -65,6 +76,7 @@ def report_node(state: AgentState) -> AgentState:
     return {
         "final_report": run_report_agent(
             state["query"],
+            state.get("risk_profile"),
             state.get("market_notes", ""),
             state.get("fundamental_notes", ""),
             state.get("risk_notes", ""),
