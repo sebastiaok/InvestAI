@@ -7,14 +7,14 @@ from fastapi import FastAPI
 from app.graphs.investment_graph import build_graph
 from app.schemas import AnalyzeRequest, AnalyzeResponse, AgentSection
 
-app = FastAPI(title="AI Investment Analysis Multi-Agent")
+app = FastAPI(title="InvestAI Agent")
 graph = build_graph()
 logger = logging.getLogger(__name__)
 
 
 @app.get("/")
 def root():
-    return {"message": "AI Investment Analysis Multi-Agent"}
+    return {"message": "InvestAI Agent"}
 
 
 @app.post("/analyze", response_model=AnalyzeResponse)
