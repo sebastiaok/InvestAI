@@ -1,11 +1,10 @@
 # InvestAI Agent
 
-실무형 투자분석 Copilot 예제입니다. 이 프로젝트는 투자 판단을 자동으로 대신하지 않고,
-시장 조사, 뉴스 요약, 포트폴리오 리스크 점검, 리포트 초안 작성을 수행합니다.
+InvestAI Agent는 사용자의 질문과 포트폴리오 기준으로 시장 조사, 뉴스 요약, 포트폴리오 리스크 점검을 근거로 리포트 초안 작성을 수행합니다.
 
 ## 빠른 시작 (3줄)
 ```bash
-cd "/Users/a05034/Documents/Y. AI Bootcamp/Final" && source .venv/bin/activate
+source .venv/bin/activate
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 python -m streamlit run streamlit_app.py --server.port 8501 --server.headless true
 ```
