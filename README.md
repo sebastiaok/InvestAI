@@ -105,7 +105,7 @@ sequenceDiagram
     participant G as LangGraph
     participant LLM as LLM/Tools
 
-    U->>ST: 질문/티커/포트폴리오 입력
+    U->>ST: 질문/포트폴리오 입력
     ST->>API: POST /analyze
     API->>G: graph.invoke(state)
 
@@ -137,7 +137,6 @@ sequenceDiagram
 
 ### 1) 프로젝트 이동 및 가상환경 준비
 ```bash
-cd "/Users/a05034/Documents/Y. AI Bootcamp/Final"
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
@@ -151,19 +150,11 @@ python -m pip install -r requirements.txt
 - `AOAI_DEPLOY_GPT4O_MINI` : 챗 배포명(예: `gpt-4o-mini`)
 - `AOAI_API_VERSION` : 기본값 `2024-02-15-preview` (선택)
 
-예시:
-```bash
-AOAI_ENDPOINT=https://<your-resource>.openai.azure.com/
-AOAI_API_KEY=<your-key>
-AOAI_DEPLOY_GPT4O_MINI=gpt-4o-mini
-AOAI_API_VERSION=2024-02-15-preview
-```
 
 ### 3) FastAPI 서버 실행 (백엔드)
 기본 포트는 `8000`을 권장합니다.
 
 ```bash
-cd "/Users/a05034/Documents/Y. AI Bootcamp/Final"
 source .venv/bin/activate
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
@@ -181,7 +172,6 @@ curl -s http://127.0.0.1:8000/
 기본 포트는 `8501`입니다.
 
 ```bash
-cd "/Users/a05034/Documents/Y. AI Bootcamp/Final"
 source .venv/bin/activate
 python -m streamlit run streamlit_app.py --server.port 8501 --server.headless true
 ```
@@ -233,7 +223,6 @@ kill -9 $(lsof -tiTCP:8000 -sTCP:LISTEN)
 
 ### Azure OpenAI 연결 점검
 ```bash
-cd "/Users/a05034/Documents/Y. AI Bootcamp/Final"
 source .venv/bin/activate
 python scripts/check_aoai.py
 ```
