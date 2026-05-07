@@ -1,4 +1,5 @@
 import json
+import time
 from uuid import uuid4
 
 import requests
@@ -67,6 +68,42 @@ def decode_uploaded_research_file(uploaded_file):
         except Exception:
             return ""
     return decode_uploaded_text(uploaded_file)
+
+
+def normalize_api_base(raw: str) -> str:
+    return (raw or "").strip().rstrip("/")
+
+
+def ensure_api_server_up(api_base: str, timeout_sec: int = 4) -> None:
+    """분석 시작 전에 FastAPI 생존 여부를 짧게 점검한다."""
+    if not api_base:
+        raise requests.RequestException("FastAPI URL이 비어 있습니다.")
+    health_url = f"{api_base}/"
+    for _ in range(3):
+        try:
+            resp = requests.get(health_url, timeout=timeout_sec)
+            if resp.ok:
+                return
+        except requests.RequestException:
+            time.sleep(0.4)
+    raise requests.RequestException(
+        f"FastAPI 연결 실패 ({health_url}). 서버가 실행 중인지 확인하세요: "
+        "python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000"
+    )
+
+
+def post_with_retry(url: str, payload: dict, timeout_sec: int, retries: int = 2) -> requests.Response:
+    last_exc: requests.RequestException | None = None
+    for attempt in range(retries + 1):
+        try:
+            return requests.post(url, json=payload, timeout=timeout_sec)
+        except requests.RequestException as exc:
+            last_exc = exc
+            if attempt < retries:
+                time.sleep(0.5 * (attempt + 1))
+    if last_exc:
+        raise last_exc
+    raise requests.RequestException("요청 실패")
 
 
 def render_plan(plan):
@@ -144,6 +181,7 @@ with st.sidebar:
         key="api_base_input",
         disabled=st.session_state.is_analyzing,
     )
+    api_base = normalize_api_base(api_base)
     risk_profile = st.selectbox(
         "Risk Profile",
         ["conservative", "balanced", "aggressive"],
@@ -286,6 +324,7 @@ if st.session_state.run_requested:
             merged_portfolio_text = f"{merged_portfolio_text}\n{uploaded_text}" if merged_portfolio_text else uploaded_text
 
         try:
+            ensure_api_server_up(api_base)
             # 선택 입력: 리서치 문서가 있을 때만 선행 전처리/인덱싱
             st.session_state.last_research_used = bool(research_files)
             if research_files:
@@ -304,16 +343,17 @@ if st.session_state.run_requested:
                         }
                     )
                 if documents:
-                    ingest_resp = requests.post(
+                    ingest_resp = post_with_retry(
                         f"{api_base}/ingest-docs",
-                        json={
+                        payload={
                             "documents": documents,
                             "chunk_size": int(chunk_size),
                             "chunk_overlap": int(chunk_overlap),
                             "save_to_research_dir": True,
                             "rebuild_index": True,
                         },
-                        timeout=180,
+                        timeout_sec=180,
+                        retries=2,
                     )
                     if ingest_resp.ok:
                         st.session_state.ingest_data = ingest_resp.json()
@@ -323,9 +363,9 @@ if st.session_state.run_requested:
                         st.session_state.ingest_error = f"문서 전처리 실패 — {format_http_api_error(ingest_resp)}"
                         raise requests.RequestException(st.session_state.ingest_error)
 
-            resp = requests.post(
+            resp = post_with_retry(
                 f"{api_base}/analyze",
-                json={
+                payload={
                     "query": query,
                     "ticker": "",
                     "portfolio_text": merged_portfolio_text,
@@ -333,7 +373,8 @@ if st.session_state.run_requested:
                     "session_id": st.session_state.session_id,
                     "reset_memory": st.session_state.reset_memory_requested,
                 },
-                timeout=120,
+                timeout_sec=120,
+                retries=1,
             )
             if resp.ok:
                 st.session_state.result_data = resp.json()
