@@ -107,27 +107,57 @@ flowchart TD
 
 ## 5. RAG 설계
 
-### 5.1 입력 소스 및 포맷
+### 5.1 데이터 수집/전처리 파이프라인
 
-- 리서치 저장 경로: `data/research`
-- 지원 포맷: `md`, `txt`, `pdf`
-  - PDF는 `pypdf.PdfReader`로 텍스트 추출
-
-### 5.2 전처리/청킹
-
-- `clean_text`: 제어문자/URL/공백 정규화
-- `chunk_documents`:
-  - 기본 `chunk_size=900`
-  - 기본 `chunk_overlap=120`
-- 메타데이터:
+- 진입 경로
+  - UI: `streamlit_app.py`에서 리서치 파일 업로드 시 `/ingest-docs`를 분석 실행 직전에 자동 호출
+  - API: `app/main.py`의 `/ingest-docs`가 `IngestDocumentsRequest` 검증 후 전처리/인덱싱 수행
+- 입력 포맷/소스
+  - 지원 확장자: `md`, `txt`, `pdf`
+  - 저장 경로: `data/research` (옵션 `save_to_research_dir=true`일 때)
+  - PDF 처리: `app/rag/preprocess.py`에서 `pypdf.PdfReader`로 페이지별 텍스트 추출
+- 전처리
+  - `clean_text`: 제어문자 제거, URL 정규화, 불필요 공백 정리
+  - 문서 유형 추론(`doc_type`) 및 티커/섹션 메타 보강
+- 청킹
+  - `chunk_documents`에서 `RecursiveCharacterTextSplitter` 기반 분할
+  - 기본값: `chunk_size=900`, `chunk_overlap=120` (UI/API에서 사용자 조정 가능)
+- 청크 메타데이터
   - `source_id`, `source_path`, `doc_type`, `ticker`, `section`, `chunk_index`, `hash`, `ingested_at`
+  - 인제스트 응답에 `generated_chunks`, `chunk_previews`, `warnings` 포함
 
-### 5.3 인덱스 전략
+### 5.2 임베딩 모델 및 Vector DB 선택
 
-- 벡터스토어: FAISS (`faiss-cpu`)
-- 저장 경로: `data/vector_store/faiss`
-- `build_or_load_vector_store`로 lazy build/load
-- 검색: `retrieve_for_query(query, ticker, k)` + ticker 후보 필터 fallback
+- 임베딩 모델
+  - OpenAI/Azure OpenAI 임베딩을 사용하며 모델명은 환경변수(`app/config.py`)로 관리
+  - 임베딩 생성은 벡터스토어 로드/빌드 시점(`build_or_load_vector_store`)에 수행
+- Vector DB
+  - 선택: FAISS (`faiss-cpu`)
+  - 이유: 로컬 개발 환경에서 빠른 유사도 검색, 단순한 파일 기반 운영, 별도 서버 의존성 최소화
+- 저장/로딩 전략
+  - 저장 경로: `data/vector_store/faiss`
+  - `build_or_load_vector_store`가 인덱스 존재 여부에 따라 lazy load/build
+  - 필요 시 `rebuild_index` 플래그로 전체 재색인
+- 운영 제약
+  - 파일 기반 인덱스 특성상 동시 업데이트/다중 인스턴스 운영에는 별도 락/배포 전략 필요
+
+### 5.3 검색 로직과 응답 생성 방식
+
+- 검색 진입점
+  - 핵심 함수: `app/rag/retriever.py`의 `retrieve_for_query(query, ticker, k)`
+  - 래퍼: `app/services/retriever.py`의 `retrieve_research_context` (테스트/호환 레이어)
+- 검색 절차
+  - 질의 임베딩 -> 유사도 top-k 검색
+  - `ticker`가 있으면 메타 기반 필터 우선 적용, 결과 부족 시 후보 범위를 완화하는 fallback 수행
+  - 결과를 `format_rag_context`로 모델 입력 친화 포맷으로 변환
+- 그래프 내 주입 방식
+  - Planner task에서 `rag/research`가 활성화되면 `rag` 노드 선행
+  - `rag_context`와 `citations`가 이후 specialist 및 `report` 노드로 전달됨
+  - Planner/Reviewer/Report는 `rag_search` tool도 호출 가능하여 필요 시 재조회
+- 최종 응답 생성
+  - 각 agent 산출 + RAG 근거를 종합해 `report` 노드에서 `final_report` 생성
+  - `report_verify_agent`의 self-verify 루프로 형식/근거 일관성 재검증 후 확정
+  - API 응답은 `final_report`, `sections`, `citations`를 함께 반환해 근거 추적 가능성을 유지
 
 ## 6. 멀티턴 메모리 설계
 
@@ -322,3 +352,188 @@ flowchart TD
 - Planner Plan
 - Agent별 결과(expander)
 - Citations(expander)
+
+## 15. 사용자 시나리오/구조/플로우 (발표 자료용)
+
+### 3.1 사용자 시나리오(Use Case Scenario)
+
+#### 사용자 목표와 과제 흐름
+
+- 목표
+  - 투자 질문(예: 특정 종목 매수/비중 조정/리스크 점검)에 대해 근거 기반의 분석 리포트를 빠르게 확인한다.
+  - 필요 시 포트폴리오와 리서치 문서를 함께 제공해 맞춤형 분석 정확도를 높인다.
+- 과제 흐름
+  - 질문을 입력한다(필수).
+  - 포트폴리오 텍스트/파일을 선택적으로 입력한다.
+  - 리서치 문서를 선택적으로 업로드하고 청크 파라미터를 설정한다.
+  - 분석 실행 후 최종 리포트, 에이전트별 결과, 인용 근거를 확인한다.
+  - 같은 `session_id`를 유지해 후속 질문을 이어가고, 필요 시 메모리를 초기화한다.
+
+#### 서비스 이용 단계별 행동 정의
+
+1. 접속/설정
+   - 사용자는 Streamlit 화면에서 API URL, `risk_profile`, `session_id`를 설정한다.
+2. 입력 준비
+   - 필수: 질문(`query`) 입력
+   - 선택: 포트폴리오 입력, 리서치 문서 업로드(`md/txt/pdf`)
+3. 문서 인제스트(선택)
+   - 문서가 있으면 `/ingest-docs`가 먼저 실행되어 전처리/청킹/인덱싱을 수행한다.
+4. 분석 요청
+   - `/analyze` 호출로 LangGraph 멀티에이전트 파이프라인이 실행된다.
+5. 결과 확인
+   - 최종 리포트, 세션 메모리, planner plan, agent 결과, citations를 확인한다.
+6. 반복/후속 질의
+   - 같은 세션으로 다음 질문을 보내 멀티턴 분석을 이어가거나 `reset_memory`로 세션을 리셋한다.
+
+### 3.2 시스템 구조도 / Multi-Agent 다이어그램
+
+아래 두 가지를 모두 포함한다.
+
+#### 시스템 전체 구조도
+
+```mermaid
+flowchart LR
+    U[User] --> UI[Streamlit UI]
+    UI -->|선택: 문서 업로드| ING[/POST /ingest-docs/]
+    UI -->|필수: 질문 입력| AN[/POST /analyze/]
+
+    ING --> PP[Preprocess + Chunking]
+    PP --> VS[(FAISS Vector DB)]
+
+    AN --> API[FastAPI]
+    API --> LG[LangGraph Orchestrator]
+    LG --> LLM[OpenAI/Azure OpenAI]
+    LG --> VS
+    LG --> MEM[(MemorySaver + InMemoryStore)]
+    LG --> API
+    API --> UI
+    UI --> U
+```
+
+#### Multi-Agent 구성도(LangGraph)
+
+```mermaid
+flowchart TD
+    M[memory_bootstrap] --> P[planner]
+    P -->|tasks.rag or tasks.research| R[rag]
+    P -->|direct specialist| MK[market]
+    R --> MK
+    MK --> F[fundamental]
+    F --> RK[risk]
+    RK --> PF[portfolio]
+    PF --> RV[reviewer]
+    RV --> RP[report]
+    RP --> END((END))
+
+    P -.optional tool calls.-> T1[quote/news/rag_search]
+    RV -.optional tool calls.-> T2[rag_search]
+    RP -.optional tool calls.-> T3[rag_search + market + fundamental]
+```
+
+### 3.3 서비스 플로우(Flow Chart / Sequence Diagram 등)
+
+사용자 요청 → Agent 처리 → RAG 검색 → 응답 생성 → UI 출력까지의 시퀀스:
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant UI as Streamlit
+    participant API as FastAPI
+    participant Graph as LangGraph
+    participant RAG as Retriever/FAISS
+    participant LLM as LLM+Tools
+    participant Mem as Session Memory
+
+    User->>UI: 질문 입력(필수) + 옵션 입력(포트폴리오/문서)
+    alt 리서치 문서 업로드 있음
+        UI->>API: POST /ingest-docs
+        API->>RAG: 전처리/청킹/임베딩/인덱싱
+        RAG-->>API: 인제스트 결과(청크/메타)
+        API-->>UI: ingest 응답
+    end
+
+    UI->>API: POST /analyze
+    API->>Graph: invoke(state, thread_id=session_id)
+    Graph->>Mem: 이전 요약/프로필 로드(memory_bootstrap)
+    Graph->>LLM: planner 실행 + task 결정
+    opt rag/research task 활성화
+        Graph->>RAG: retrieve_for_query(query, ticker, k)
+        RAG-->>Graph: rag_context + citations
+    end
+    Graph->>LLM: specialist agents 실행(market/fundamental/risk/portfolio)
+    Graph->>LLM: reviewer/report + self-verify
+    Graph->>Mem: turn 결과 저장(summary/profile)
+    Graph-->>API: final_report/sections/citations
+    API-->>UI: AnalyzeResponse
+    UI-->>User: 최종 리포트 + 근거 + 세션정보 표시
+```
+
+### 3.4 LLM Fundamentals 기반 Structured Output / Function Calling
+
+#### Structured Output (실구현)
+
+- JSON 기반 구조화 응답을 핵심 계약으로 사용한다.
+  - Planner: `objective/tasks/output_style` 형태의 plan JSON 생성
+  - Memory Profile: `last_user_intent`, `key_risks`, `action_items`, `carry_over_flags` 등 구조화 필드 생성
+- 구현 위치
+  - `app/services/llm.py`
+    - `json_chat(...)`, `run_prompt_chain_json(...)`
+    - `parse_json_object_from_assistant_text(...)`로 코드펜스/주변 텍스트 포함 응답에서도 JSON 객체 추출
+- 안정성 처리
+  - JSON 파싱 실패 시 `LLMJSONParseError(stage=...)`로 분리 응답(HTTP 422)
+  - LLM 호출 실패는 `LLMInvocationError(subtype=...)`로 분리(403/429/503/502 매핑)
+
+#### Function Calling (실구현)
+
+- OpenAI tool/function calling을 `tool_choice=auto`로 사용한다.
+- 구현 위치
+  - `app/services/llm.py`의 `chat_with_tools(...)`
+    - tool schema 변환
+    - tool call loop(`max_steps`) 실행
+    - 도구 인자 JSON 파싱 및 예외 처리
+  - `app/tools/investment_tools.py`
+    - `quote_lookup`, `news_lookup`, `fundamental_lookup`, `portfolio_holdings`, `rag_search`
+    - role별 tool bundle(`get_planner_tools`, `get_reviewer_tools`, `get_report_tools`)
+- 적용 방식
+  - Planner/Reviewer/Report가 상황에 따라 도구를 호출해 근거를 보강하고, 결과를 최종 보고서와 인용 정보에 반영한다.
+
+### 3.5 MCP 기반 파일·시스템·API 연동
+
+#### 현재 구현 상태 (실구현)
+
+- MCP 확장을 위한 안전한 연결 포인트를 구현했다.
+  - 파일: `app/tools/mcp_tools.py`
+  - `optional_mcp_tools()`가 환경변수 `MCP_TOOLS_ENABLED`를 확인해 MCP 도구를 동적으로 병합
+  - 기본값은 빈 리스트 반환(미설정 시 런타임 영향 없음)
+- 기존 도구 체계와의 통합
+  - `extend_with_optional_mcp(...)`를 통해 planner/reviewer/report tool set에 MCP 도구를 추가할 수 있음
+
+#### 연동 범위 정의
+
+- 파일/시스템/API 자원에 대한 MCP 기반 접근은 "확장 가능 구조"까지 반영되어 있으며,
+  실제 외부 MCP 서버/도구 구현(`load_mcp_stdio_tools`)은 프로젝트 환경에 맞춰 후속 연결하도록 설계됨.
+- 즉, 본 프로젝트는 **MCP-ready 구조(Integration Point)** 를 구현했고, 도메인별 MCP 서버 연결은 운영 환경 단계에서 활성화한다.
+
+### 3.6 A2A 기반 Agent 협업 구조
+
+#### 현재 협업 구조 (실구현)
+
+- 본 서비스의 에이전트 협업은 LangGraph 상태 기반 오케스트레이션으로 구현되어 있다.
+  - 노드: `memory_bootstrap -> planner -> rag -> market -> fundamental -> risk -> portfolio -> reviewer -> report`
+  - 상태 공유: `AgentState`를 통해 `plan`, `rag_context`, `citations`, specialist notes, `memory_profile` 전달
+  - 동적 라우팅: planner task 및 carry-over flag에 따라 실행 노드/순서를 조정
+- 의미상 A2A(Agent-to-Agent) 협업
+  - 각 agent의 산출물이 다음 agent 입력으로 전달되고, reviewer/report가 이를 종합해 최종 응답을 생성
+  - 독립 agent 간 메시지 교환 효과를 그래프 상태 전이로 구현
+
+#### A2A 관점 정리
+
+- 표준 A2A 프로토콜 서버를 직접 붙인 구조는 아니지만,
+  실질적으로는 "Agent 간 역할 분리 + 상태 전달 + 순차/조건부 협업"을 충족한다.
+- 추후 표준 A2A 프로토콜을 도입할 경우에도 현재 노드/상태 계약(`AgentState`, node I/O)을 adapter 계층으로 매핑하기 쉬운 구조다.
+
+### 3.7 발표용 한 줄 요약 (3.4~3.6)
+
+- **Structured Output / Function Calling**: LLM 응답을 JSON 계약으로 고정하고, function-calling으로 실시간 도구 조회를 결합해 근거 중심 분석을 생성한다.
+- **MCP 연동**: 현재는 MCP 도구를 안전하게 주입할 수 있는 MCP-ready 구조를 구현했으며, 운영 환경에서 파일·시스템·외부 API 서버를 선택적으로 연결한다.
+- **A2A 협업**: LangGraph에서 역할 분리된 에이전트가 상태를 이어받아 순차/조건부로 협업하며, reviewer/report 단계에서 결과를 통합해 최종 리포트를 만든다.
