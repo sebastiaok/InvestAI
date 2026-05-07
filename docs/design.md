@@ -393,41 +393,47 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    U[User] --> UI[Streamlit UI]
-    UI -->|선택: 문서 업로드| ING[/POST /ingest-docs/]
-    UI -->|필수: 질문 입력| AN[/POST /analyze/]
+    U[사용자] --> UI[Streamlit 화면]
 
-    ING --> PP[Preprocess + Chunking]
-    PP --> VS[(FAISS Vector DB)]
+    subgraph APP[InvestAI 서비스]
+        API[FastAPI]
+        LG[LangGraph 오케스트레이터]
+        LLM[LLM + Tool Calling]
+        RAG[전처리/검색 모듈]
+        VS[(FAISS Vector DB)]
+        MEM[(세션 메모리<br/>MemorySaver + InMemoryStore)]
+    end
 
-    AN --> API[FastAPI]
-    API --> LG[LangGraph Orchestrator]
-    LG --> LLM[OpenAI/Azure OpenAI]
-    LG --> VS
-    LG --> MEM[(MemorySaver + InMemoryStore)]
+    UI -->|분석 요청| API
+    UI -->|문서 업로드(선택)| API
+    API --> LG
+    LG --> LLM
+    LG --> RAG
+    RAG --> VS
+    LG --> MEM
     LG --> API
-    API --> UI
-    UI --> U
+    API -->|분석 결과 + 인용근거| UI
 ```
 
 #### Multi-Agent 구성도(LangGraph)
 
 ```mermaid
 flowchart TD
-    M[memory_bootstrap] --> P[planner]
-    P -->|tasks.rag or tasks.research| R[rag]
-    P -->|direct specialist| MK[market]
-    R --> MK
-    MK --> F[fundamental]
-    F --> RK[risk]
-    RK --> PF[portfolio]
-    PF --> RV[reviewer]
-    RV --> RP[report]
+    M[memory_bootstrap<br/>이전 대화 로드] --> P[planner<br/>분석 계획 수립]
+    P --> D{RAG 필요?}
+    D -->|Yes| R[rag<br/>문서 검색]
+    D -->|No| MK[market]
+    R --> MK[market<br/>시세/뉴스]
+    MK --> F[fundamental<br/>재무]
+    F --> RK[risk<br/>리스크]
+    RK --> PF[portfolio<br/>포트폴리오]
+    PF --> RV[reviewer<br/>품질 점검]
+    RV --> RP[report<br/>최종 보고서]
     RP --> END((END))
 
-    P -.optional tool calls.-> T1[quote/news/rag_search]
-    RV -.optional tool calls.-> T2[rag_search]
-    RP -.optional tool calls.-> T3[rag_search + market + fundamental]
+    P -.도구 호출.-> T1[quote/news/rag_search]
+    RV -.도구 호출.-> T2[rag_search]
+    RP -.도구 호출.-> T3[rag_search + market/fundamental]
 ```
 
 ### 3.3 서비스 플로우(Flow Chart / Sequence Diagram 등)
