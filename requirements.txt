@@ -5,6 +5,10 @@ pydantic
 python-dotenv
 openai
 langchain
+langchain-community
+langchain-openai
+langchain-text-splitters
 langgraph
 faiss-cpu
 pandas
+pypdf

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from app.prompts.advanced_prompting import REPORT_STRUCTURE_FEW_SHOT_KO
 from app.prompts.system_prompts import REPORT_SYSTEM
-from app.services.llm import chat
+from app.services.llm import chat, chat_with_tools
+from app.tools.investment_tools import extend_with_optional_mcp, get_report_tools
 
 
 def _report_profile_instruction(risk_profile: str | None) -> str:
@@ -30,9 +32,12 @@ def run_report_agent(
     risk_notes: str,
     portfolio_notes: str,
     review_notes: str,
+    rag_context: str = "",
 ) -> str:
     profile_instruction = _report_profile_instruction(risk_profile)
     prompt = f"""
+{REPORT_STRUCTURE_FEW_SHOT_KO}
+
 질문: {query}
 리스크 성향: {risk_profile}
 성향별 리포트 지침: {profile_instruction}
@@ -41,6 +46,7 @@ def run_report_agent(
 리스크 메모: {risk_notes}
 포트폴리오 메모: {portfolio_notes}
 리뷰어 수정 포인트: {review_notes}
+RAG 근거: {rag_context}
 
 다음 형식으로 최종 투자 브리프를 작성하라.
 1. 한줄 결론
@@ -49,4 +55,7 @@ def run_report_agent(
 4. 포트폴리오 관점 메모
 5. 추가 확인 필요 항목
 """
-    return chat(REPORT_SYSTEM, prompt)
+    tools = extend_with_optional_mcp(get_report_tools())
+    tool_result = chat_with_tools(REPORT_SYSTEM, prompt, tools=tools, max_steps=10)
+    draft = (tool_result.get("answer") or "").strip()
+    return draft if draft else chat(REPORT_SYSTEM, prompt)
