@@ -1,0 +1,32 @@
+flowchart TD
+    M[memory_bootstrap<br/>이전 대화 로드] --> P[planner<br/>분석 계획 수립]
+    P --> D{RAG 필요?}
+    D -->|Yes| R[rag<br/>문서 검색]
+    D -->|No| MK[market]
+    R --> MK[market<br/>시세/뉴스]
+    MK --> F[fundamental<br/>재무]
+    F --> RK[risk<br/>리스크]
+    RK --> PF[portfolio<br/>포트폴리오]
+    PF --> RV[reviewer<br/>품질 점검]
+    RV --> RP[report<br/>최종 보고서]
+    RP --> END((END))
+
+    P -.도구 호출.-> T1[quote/news/rag_search]
+    RV -.도구 호출.-> T2[rag_search]
+    RP -.도구 호출.-> T3[rag_search + market/fundamental]
+
+    classDef memory fill:#FEF3C7,stroke:#B45309,stroke-width:1.5px,color:#78350F;
+    classDef planner fill:#EDE9FE,stroke:#6D28D9,stroke-width:1.5px,color:#4C1D95;
+    classDef rag fill:#DBEAFE,stroke:#1D4ED8,stroke-width:1.5px,color:#1E3A8A;
+    classDef specialist fill:#DCFCE7,stroke:#15803D,stroke-width:1.5px,color:#14532D;
+    classDef quality fill:#FCE7F3,stroke:#BE185D,stroke-width:1.5px,color:#831843;
+    classDef endNode fill:#E5E7EB,stroke:#374151,stroke-width:1.5px,color:#111827;
+    classDef tool fill:#FFF7ED,stroke:#C2410C,stroke-width:1.2px,color:#7C2D12;
+
+    class M memory;
+    class P,D planner;
+    class R rag;
+    class MK,F,RK,PF specialist;
+    class RV,RP quality;
+    class END endNode;
+    class T1,T2,T3 tool;

@@ -1,0 +1,31 @@
+sequenceDiagram
+    participant User
+    participant UI as Streamlit
+    participant API as FastAPI
+    participant Graph as LangGraph
+    participant RAG as Retriever/FAISS
+    participant LLM as LLM+Tools
+    participant Mem as Session Memory
+
+    User->>UI: 질문 입력(필수) + 옵션 입력(포트폴리오/문서)
+    alt 리서치 문서 업로드 있음
+        UI->>API: POST /ingest-docs
+        API->>RAG: 전처리/청킹/임베딩/인덱싱
+        RAG-->>API: 인제스트 결과(청크/메타)
+        API-->>UI: ingest 응답
+    end
+
+    UI->>API: POST /analyze
+    API->>Graph: invoke(state, thread_id=session_id)
+    Graph->>Mem: 이전 요약/프로필 로드(memory_bootstrap)
+    Graph->>LLM: planner 실행 + task 결정
+    opt rag/research task 활성화
+        Graph->>RAG: retrieve_for_query(query, ticker, k)
+        RAG-->>Graph: rag_context + citations
+    end
+    Graph->>LLM: specialist agents 실행(market/fundamental/risk/portfolio)
+    Graph->>LLM: reviewer/report + self-verify
+    Graph->>Mem: turn 결과 저장(summary/profile)
+    Graph-->>API: final_report/sections/citations
+    API-->>UI: AnalyzeResponse
+    UI-->>User: 최종 리포트 + 근거 + 세션정보 표시

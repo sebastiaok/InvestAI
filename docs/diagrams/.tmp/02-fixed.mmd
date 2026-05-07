@@ -1,0 +1,33 @@
+flowchart LR
+    U[사용자] --> UI[Streamlit 화면]
+
+    subgraph APP[InvestAI 서비스]
+        API[FastAPI]
+        LG[LangGraph 오케스트레이터]
+        LLM[LLM + Tool Calling]
+        RAG[전처리/검색 모듈]
+        VS[(FAISS Vector DB)]
+        MEM[(세션 메모리<br/>MemorySaver + InMemoryStore)]
+    end
+
+    UI -->|분석 요청| API
+    UI -->|문서 업로드 선택| API
+    API --> LG
+    LG --> LLM
+    LG --> RAG
+    RAG --> VS
+    LG --> MEM
+    LG --> API
+    API -->|분석 결과 + 인용근거| UI
+
+    classDef user fill:#E8F4FF,stroke:#2B6CB0,stroke-width:1.5px,color:#1A365D;
+    classDef ui fill:#E6FFFA,stroke:#0F766E,stroke-width:1.5px,color:#134E4A;
+    classDef core fill:#F3E8FF,stroke:#7E22CE,stroke-width:1.5px,color:#581C87;
+    classDef data fill:#FFF7ED,stroke:#C2410C,stroke-width:1.5px,color:#7C2D12;
+    classDef memory fill:#FEF3C7,stroke:#B45309,stroke-width:1.5px,color:#78350F;
+
+    class U user;
+    class UI ui;
+    class API,LG,LLM,RAG core;
+    class VS data;
+    class MEM memory;

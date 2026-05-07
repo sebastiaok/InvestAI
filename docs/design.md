@@ -413,6 +413,18 @@ flowchart LR
     LG --> MEM
     LG --> API
     API -->|분석 결과 + 인용근거| UI
+
+    classDef user fill:#E8F4FF,stroke:#2B6CB0,stroke-width:1.5px,color:#1A365D;
+    classDef ui fill:#E6FFFA,stroke:#0F766E,stroke-width:1.5px,color:#134E4A;
+    classDef core fill:#F3E8FF,stroke:#7E22CE,stroke-width:1.5px,color:#581C87;
+    classDef data fill:#FFF7ED,stroke:#C2410C,stroke-width:1.5px,color:#7C2D12;
+    classDef memory fill:#FEF3C7,stroke:#B45309,stroke-width:1.5px,color:#78350F;
+
+    class U user;
+    class UI ui;
+    class API,LG,LLM,RAG core;
+    class VS data;
+    class MEM memory;
 ```
 
 #### Multi-Agent 구성도(LangGraph)
@@ -434,6 +446,22 @@ flowchart TD
     P -.도구 호출.-> T1[quote/news/rag_search]
     RV -.도구 호출.-> T2[rag_search]
     RP -.도구 호출.-> T3[rag_search + market/fundamental]
+
+    classDef memory fill:#FEF3C7,stroke:#B45309,stroke-width:1.5px,color:#78350F;
+    classDef planner fill:#EDE9FE,stroke:#6D28D9,stroke-width:1.5px,color:#4C1D95;
+    classDef rag fill:#DBEAFE,stroke:#1D4ED8,stroke-width:1.5px,color:#1E3A8A;
+    classDef specialist fill:#DCFCE7,stroke:#15803D,stroke-width:1.5px,color:#14532D;
+    classDef quality fill:#FCE7F3,stroke:#BE185D,stroke-width:1.5px,color:#831843;
+    classDef end fill:#E5E7EB,stroke:#374151,stroke-width:1.5px,color:#111827;
+    classDef tool fill:#FFF7ED,stroke:#C2410C,stroke-width:1.2px,color:#7C2D12;
+
+    class M memory;
+    class P,D planner;
+    class R rag;
+    class MK,F,RK,PF specialist;
+    class RV,RP quality;
+    class END end;
+    class T1,T2,T3 tool;
 ```
 
 ### 3.3 서비스 플로우(Flow Chart / Sequence Diagram 등)

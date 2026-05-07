@@ -1,0 +1,9 @@
+flowchart TD
+    UI[Streamlit] -->|POST /ingest-docs (optional)| ING[Ingestion]
+    UI -->|POST /analyze| API[FastAPI]
+    API --> GRAPH[LangGraph App]
+    GRAPH --> LLM[LLM + Tool Calling]
+    GRAPH --> RAG[FAISS Retriever]
+    GRAPH --> MEM[Checkpointer + Store]
+    GRAPH --> API
+    API --> UI
